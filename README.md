@@ -21,4 +21,4 @@ This Assignment uses Pyspark and python  to analyze earthquake data and visualiz
 
 ### Visualization Map Sample
 
-![Alt text](relative%?SampleImage\Map.pngraw=true "Title")
+![Alt text](relative%SampleImage\Map.png?raw=true "Title")
