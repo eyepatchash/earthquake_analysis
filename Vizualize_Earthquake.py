@@ -2,10 +2,14 @@
 import folium
 from folium.plugins import MarkerCluster
 import pandas as pd
+import configparser
 
 
-#File path for Processed Output csv
-path = r'C:\Users\aswan\OneDrive\Documents\Earthquake_Analysis\data\output.csv'
+#Loading the Config file
+config = configparser.ConfigParser()
+config.read('configfile.cfg')
+
+path = config.get('OUTPUT','MERGED_FILE')
 
 # Load the processed earthquake data
 df = pd.read_csv(path)
@@ -24,12 +28,15 @@ color_scheme = {
     'High': 'red'
 }
 
-# Add markers to the cluster instead of directly to the map
+# Add markers to the cluster instead of directly to the map and pop message
 for _, row in df.iterrows():
     color = color_scheme.get(row['Magnitude Category'], 'gray')
+    popup_message = folium.Popup(f"Magnitude: {row['Magnitude']}, Depth: {row['Depth']}km, Category: {row['Magnitude Category']}", max_width=300)
+    
     folium.CircleMarker(
         location=[row['Latitude'], row['Longitude']],
         radius=7,
+        popup=popup_message,
         color=color,
         fill=True,
         fill_color=color,

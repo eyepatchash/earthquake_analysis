@@ -2,8 +2,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_timestamp, udf, avg,concat, lit
 from pyspark.sql.types import StructType, StructField, StringType, FloatType
-
-
+import configparser
 
 #Import UDF Functions
 from Categorize_Magnitude import magnitude_category_udf
@@ -12,15 +11,21 @@ from Calculate_Distance import calculate_distance_udf
 #Output Handling 
 from WriteProcessedFile import outputfile
 
+#Loading the Config file
+config = configparser.ConfigParser()
+config.read('configfile.cfg')
+
+input_file = config.get('INPUT','FILE_PATH')
+spark_output = config.get('OUTPUT','OUTPUT_PATH')
+merged_file = config.get('OUTPUT','MERGED_FILE')
+
+
 
 # Initialize SparkSession
 spark = SparkSession.builder \
     .appName("Earthquake Analysis") \
     .getOrCreate()
 
-
-
-path = r"C:\Users\aswan\OneDrive\Documents\Earthquake_Analysis\data\database.csv"
 
 #Schema for Earthquake database.csv 
 schema = StructType([
@@ -30,10 +35,15 @@ schema = StructType([
     StructField("Longitude", FloatType(), True),
     StructField("Type", StringType(), True),
     StructField("Depth", FloatType(), True),
+    StructField("Depth Error", FloatType(), True),
+    StructField("Depth Seismic Stations", FloatType(), True),
     StructField("Magnitude", FloatType(), True),
 ])
 # Load the dataset into a PySpark DataFrame
-df = spark.read.csv(path, header=True,schema=schema)
+df = spark.read.csv(input_file, schema=schema,header=True,inferSchema=True)
+
+#Dropping Not Needed Middle Columns
+df = df.drop("Depth Error", "Depth Seismic Stations")
 
 # Converting 'Date' and 'Time' into a single 'Timestamp' column
 df = df.withColumn("Timestamp", to_timestamp(concat(col("Date"), lit(" "), col("Time")), "MM/dd/yyyy HH:mm:ss"))
@@ -46,6 +56,7 @@ df_grouped = df_filtered.groupBy("Type").agg(
     avg("Depth").alias("Average Depth"),
     avg("Magnitude").alias("Average Magnitude")
 )
+df_grouped.show()
 
 # Adding a new column 'Magnitude' Using UDF function to categorize magnitude 
 df_filtered = df_filtered.withColumn("Magnitude Category", magnitude_category_udf(col("Magnitude")))
@@ -54,14 +65,9 @@ df_filtered = df_filtered.withColumn("Magnitude Category", magnitude_category_ud
 ref = [0,0] #Passing Reference as (0.0)
 df_filtered = df_filtered.withColumn("DistanceFromRef", calculate_distance_udf(col("Latitude"), col("Longitude"),lit(ref[0]),lit(ref[1])))
 
-# df_filtered.printSchema()
 # Save the processed DataFrame to a CSV file
-output_path =  r"C:\Users\aswan\OneDrive\Documents\Earthquake_Analysis\data\output"
-# # # df.coalesce(1).write.option("header","true").format("csv").save(output_path)
+df_filtered.write.mode('overwrite').csv(spark_output, header=True)
 
-# # # df_grouped.show()
-df_filtered.write.mode('overwrite').csv(output_path, header=True)
-
-merged_file =  r"C:\Users\aswan\OneDrive\Documents\Earthquake_Analysis\Earthquake_Data_Processed.csv"
-outputfile(output_path,merged_file)
+#Using Created Merge Function
+outputfile(spark_output,merged_file)
 
